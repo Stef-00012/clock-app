@@ -1,99 +1,22 @@
 import { useState, useEffect } from "react";
-import Animated, {
-	useSharedValue,
-	useAnimatedStyle,
-} from "react-native-reanimated";
-import {
-	Gesture,
-	GestureDetector,
-	GestureHandlerRootView,
-} from "react-native-gesture-handler";
-import { StyleSheet, Dimensions, Text, View } from "react-native";
+import Animated, { type AnimatedStyle } from "react-native-reanimated";
+import { StyleSheet, Text } from "react-native";
 
-function clamp(val: number, min: number, max: number) {
-	return Math.min(Math.max(val, min), max);
-}
-
-const { width, height } = Dimensions.get("screen");
 const AnimatedView = Animated.View;
 
 interface Props {
 	showSeconds: boolean;
 	use12HFormat: boolean;
 	clockColor: string;
+	animatedStyles: AnimatedStyle;
 }
 
 export default function Clock({
 	showSeconds,
 	use12HFormat,
 	clockColor,
+	animatedStyles,
 }: Props) {
-	const translationX = useSharedValue(0);
-	const translationY = useSharedValue(0);
-	const prevTranslationX = useSharedValue(0);
-	const prevTranslationY = useSharedValue(0);
-
-	const scale = useSharedValue(1);
-	const startScale = useSharedValue(0);
-
-	const angle = useSharedValue(0);
-	const startAngle = useSharedValue(0);
-
-	const animatedStyles = useAnimatedStyle(() => ({
-		transform: [
-			{ translateX: translationX.value },
-			{ translateY: translationY.value },
-			{ rotate: `${angle.value}rad` },
-			{ scale: scale.value },
-		],
-	}));
-
-	const pan = Gesture.Pan()
-		.minDistance(1)
-		.onStart(() => {
-			prevTranslationX.value = translationX.value;
-			prevTranslationY.value = translationY.value;
-		})
-		.onUpdate((event) => {
-			const maxTranslateX = width;
-			const maxTranslateY = height;
-
-			translationX.value = clamp(
-				prevTranslationX.value + event.translationX,
-				-maxTranslateX,
-				maxTranslateX,
-			);
-			translationY.value = clamp(
-				prevTranslationY.value + event.translationY,
-				-maxTranslateY,
-				maxTranslateY,
-			);
-		})
-		.runOnJS(true);
-
-	const pinch = Gesture.Pinch()
-		.onStart(() => {
-			startScale.value = scale.value;
-		})
-		.onUpdate((event) => {
-			scale.value = clamp(
-				startScale.value * event.scale,
-				0.5,
-				Math.min(width, height),
-			);
-		})
-		.runOnJS(true);
-
-	const rotation = Gesture.Rotation()
-		.onStart(() => {
-			startAngle.value = angle.value;
-		})
-		.onUpdate((event) => {
-			angle.value = startAngle.value + event.rotation;
-		});
-
-	const allGestures = Gesture.Simultaneous(pinch, rotation, pan);
-
 	const [time, setTime] = useState("");
 
 	useEffect(() => {
@@ -117,7 +40,6 @@ export default function Clock({
 			height: 60,
 			display: "flex",
 			justifyContent: "center",
-			// backgroundColor: "#ff0000",
 		},
 
 		text: {
@@ -128,11 +50,9 @@ export default function Clock({
 	});
 
 	return (
-		<GestureDetector gesture={allGestures}>
-			<AnimatedView style={[animatedStyles, styles.box]}>
-				<Text style={styles.text}>{time}</Text>
-			</AnimatedView>
-		</GestureDetector>
+		<AnimatedView style={[animatedStyles, styles.box]}>
+			<Text style={styles.text}>{time}</Text>
+		</AnimatedView>
 	);
 }
 

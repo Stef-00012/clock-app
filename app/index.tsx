@@ -6,8 +6,14 @@ import {
 	StatusBar,
 	Alert,
 	Switch,
+	Dimensions,
 } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+	GestureHandlerRootView,
+	Gesture,
+	GestureDetector,
+} from "react-native-gesture-handler";
+import { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { Pressable } from "@react-native-material/core";
 import SettingsModal from "@/components/Modal";
@@ -62,6 +68,74 @@ export default function Index() {
 		setSettingsShowSeconds(showSeconds);
 		setSettingsUse12HFormat(use12HFormat);
 	}, [showSettings, clockColor, backgroundColor, showSeconds, use12HFormat]);
+
+	const translationX = useSharedValue(0);
+	const translationY = useSharedValue(0);
+	const prevTranslationX = useSharedValue(0);
+	const prevTranslationY = useSharedValue(0);
+
+	const scale = useSharedValue(1);
+	const startScale = useSharedValue(0);
+
+	const angle = useSharedValue(0);
+	const startAngle = useSharedValue(0);
+
+	const { width, height } = Dimensions.get("screen");
+
+	const animatedStyles = useAnimatedStyle(() => ({
+		transform: [
+			{ translateX: translationX.value },
+			{ translateY: translationY.value },
+			{ rotate: `${angle.value}rad` },
+			{ scale: scale.value },
+		],
+	}));
+
+	const pan = Gesture.Pan()
+		.minDistance(1)
+		.onStart(() => {
+			prevTranslationX.value = translationX.value;
+			prevTranslationY.value = translationY.value;
+		})
+		.onUpdate((event) => {
+			const maxTranslateX = width;
+			const maxTranslateY = height;
+
+			translationX.value = clamp(
+				prevTranslationX.value + event.translationX,
+				-maxTranslateX,
+				maxTranslateX,
+			);
+			translationY.value = clamp(
+				prevTranslationY.value + event.translationY,
+				-maxTranslateY,
+				maxTranslateY,
+			);
+		})
+		.runOnJS(true);
+
+	const pinch = Gesture.Pinch()
+		.onStart(() => {
+			startScale.value = scale.value;
+		})
+		.onUpdate((event) => {
+			scale.value = clamp(
+				startScale.value * event.scale,
+				0.5,
+				Math.min(width, height),
+			);
+		})
+		.runOnJS(true);
+
+	const rotation = Gesture.Rotation()
+		.onStart(() => {
+			startAngle.value = angle.value;
+		})
+		.onUpdate((event) => {
+			angle.value = startAngle.value + event.rotation;
+		});
+
+	const allGestures = Gesture.Simultaneous(pinch, rotation, pan);
 
 	const styles = StyleSheet.create({
 		container: {
@@ -125,111 +199,118 @@ export default function Index() {
 			<GestureHandlerRootView>
 				<RootSiblingParent>
 					<StatusBar hidden={true} />
-					<View style={styles.container}>
-						<Header onSettingsPress={() => setShowSettings(true)} />
+					<GestureDetector gesture={allGestures}>
+						<View style={styles.container}>
+							<Header onSettingsPress={() => setShowSettings(true)} />
 
-						<View style={styles.mainContent}>
-							<Clock
-								showSeconds={showSeconds}
-								use12HFormat={use12HFormat}
-								clockColor={clockColor}
-							/>
-						</View>
-
-						<SettingsModal
-							isVisible={showSettings}
-							onClose={() => setShowSettings(false)}
-							closeSettingsRef={closeSettingsRef}
-						>
-							<View style={styles.modalContent}>
-								<Text style={styles.inputTitle}>Background Color:</Text>
-								<TextInput
-									style={styles.textInput}
-									value={settingsBackgroundColor}
-									onChangeText={(content) => {
-										setSettingsBackgroundColor(content);
-									}}
-									placeholder="#000"
-									placeholderTextColor="#aaa"
+							<View style={styles.mainContent}>
+								<Clock
+									showSeconds={showSeconds}
+									use12HFormat={use12HFormat}
+									clockColor={clockColor}
+									animatedStyles={animatedStyles}
 								/>
-
-								<Text style={styles.inputTitle}>Clock Color:</Text>
-								<TextInput
-									style={styles.textInput}
-									value={settingsClockColor}
-									onChangeText={(content) => {
-										setSettingsClockColor(content);
-									}}
-									placeholder="#fff"
-									placeholderTextColor="#aaa"
-								/>
-
-								<View style={styles.toggleContainer}>
-									<Text style={styles.inputTitle}>Show 12H Format:</Text>
-									<Switch
-										value={settingsUse12HFormat}
-										onValueChange={(value) => setSettingsUse12HFormat(value)}
-									/>
-								</View>
-
-								<View style={styles.toggleContainer}>
-									<Text style={styles.inputTitle}>Show Seconds:</Text>
-									<Switch
-										value={settingsShowSeconds}
-										onValueChange={(value) => setSettingsShowSeconds(value)}
-									/>
-								</View>
-
-								<Pressable
-									style={styles.saveButton}
-									onPress={() => {
-										if (!hexRegex.test(settingsClockColor)) {
-											Alert.alert(
-												"Invalid Settings",
-												"Clock Color must be a hexadecimal color.\nIt has been reset to #fff",
-											);
-
-											setSettingsClockColor("#fff");
-											setSettingsClockColor("#fff");
-											db.set("clockColor", "#fff");
-										} else {
-											setClockColor(settingsClockColor || "#fff");
-											db.set("clockColor", settingsClockColor || "#fff");
-										}
-
-										if (!hexRegex.test(settingsBackgroundColor)) {
-											Alert.alert(
-												"Invalid Settings",
-												"Background Color must be a hexadecimal color.\nIt has been reset to #000",
-											);
-
-											setSettingsBackgroundColor("#000");
-											setBackgroundColor("#000");
-											db.set("backgroundColor", "#000");
-										} else {
-											setBackgroundColor(settingsBackgroundColor || "#000");
-											db.set(
-												"backgroundColor",
-												settingsBackgroundColor || "#000",
-											);
-										}
-
-										setShowSeconds(settingsShowSeconds);
-										db.set("showSeconds", String(settingsShowSeconds));
-
-										setUse12HFormat(settingsUse12HFormat);
-										db.set("use12HFormat", String(settingsUse12HFormat));
-
-										setShowSettings(false);
-									}}
-								>
-									<Text>Save</Text>
-								</Pressable>
 							</View>
-						</SettingsModal>
-					</View>
+
+							<SettingsModal
+								isVisible={showSettings}
+								onClose={() => setShowSettings(false)}
+								closeSettingsRef={closeSettingsRef}
+							>
+								<View style={styles.modalContent}>
+									<Text style={styles.inputTitle}>Background Color:</Text>
+									<TextInput
+										style={styles.textInput}
+										value={settingsBackgroundColor}
+										onChangeText={(content) => {
+											setSettingsBackgroundColor(content);
+										}}
+										placeholder="#000"
+										placeholderTextColor="#aaa"
+									/>
+
+									<Text style={styles.inputTitle}>Clock Color:</Text>
+									<TextInput
+										style={styles.textInput}
+										value={settingsClockColor}
+										onChangeText={(content) => {
+											setSettingsClockColor(content);
+										}}
+										placeholder="#fff"
+										placeholderTextColor="#aaa"
+									/>
+
+									<View style={styles.toggleContainer}>
+										<Text style={styles.inputTitle}>Show 12H Format:</Text>
+										<Switch
+											value={settingsUse12HFormat}
+											onValueChange={(value) => setSettingsUse12HFormat(value)}
+										/>
+									</View>
+
+									<View style={styles.toggleContainer}>
+										<Text style={styles.inputTitle}>Show Seconds:</Text>
+										<Switch
+											value={settingsShowSeconds}
+											onValueChange={(value) => setSettingsShowSeconds(value)}
+										/>
+									</View>
+
+									<Pressable
+										style={styles.saveButton}
+										onPress={() => {
+											if (!hexRegex.test(settingsClockColor)) {
+												Alert.alert(
+													"Invalid Settings",
+													"Clock Color must be a hexadecimal color.\nIt has been reset to #fff",
+												);
+
+												setSettingsClockColor("#fff");
+												setSettingsClockColor("#fff");
+												db.set("clockColor", "#fff");
+											} else {
+												setClockColor(settingsClockColor || "#fff");
+												db.set("clockColor", settingsClockColor || "#fff");
+											}
+
+											if (!hexRegex.test(settingsBackgroundColor)) {
+												Alert.alert(
+													"Invalid Settings",
+													"Background Color must be a hexadecimal color.\nIt has been reset to #000",
+												);
+
+												setSettingsBackgroundColor("#000");
+												setBackgroundColor("#000");
+												db.set("backgroundColor", "#000");
+											} else {
+												setBackgroundColor(settingsBackgroundColor || "#000");
+												db.set(
+													"backgroundColor",
+													settingsBackgroundColor || "#000",
+												);
+											}
+
+											setShowSeconds(settingsShowSeconds);
+											db.set("showSeconds", String(settingsShowSeconds));
+
+											setUse12HFormat(settingsUse12HFormat);
+											db.set("use12HFormat", String(settingsUse12HFormat));
+
+											setShowSettings(false);
+										}}
+									>
+										<Text>Save</Text>
+									</Pressable>
+								</View>
+							</SettingsModal>
+						</View>
+					</GestureDetector>
 				</RootSiblingParent>
 			</GestureHandlerRootView>
 		</ClickOutsideProvider>
 	);
+}
+
+function clamp(val: number, min: number, max: number) {
+	return Math.min(Math.max(val, min), max);
 }
