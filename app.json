@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.stef_dp.Clock"
+      "package": "com.stefdp.clock"
     },
     "web": {
       "bundler": "metro",
